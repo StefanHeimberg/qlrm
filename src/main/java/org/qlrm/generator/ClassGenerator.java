@@ -3,76 +3,51 @@ package org.qlrm.generator;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Types;
+import java.sql.*;
 
 public class ClassGenerator {
-	
-	/**
-	 * @deprecated If the table is present in more schema the columns are duplicated.
-	 * 
-	 * @see generateFromTables( final String path, final String pkg, final String suffix, final boolean publicFields,
-	 *      final String schema, final Connection con, final String... tables)
-	 * 
-	 * 
-	 * @param path
-	 * @param pkg
-	 * @param suffix
-	 * @param publicFields
-	 * @param con
-	 * @param tables
-	 * @throws SQLException
-	 * @throws FileNotFoundException
-	 */
-	@Deprecated
-	public void generateFromTables(	final String path,
-									final String pkg,
-									final String suffix,
-									final boolean publicFields,
-									final Connection con,
-									final String... tables) throws SQLException, FileNotFoundException {
-		generateFromTables(path, pkg, suffix, publicFields, null, con, tables);
-	}
 
+    @Deprecated
+    public void generateFromTables(final String path,
+                                   final String pkg,
+                                   final String suffix,
+                                   final boolean publicFields,
+                                   final Connection con,
+                                   final String... tables) throws SQLException, FileNotFoundException {
+        generateFromTables(path, pkg, suffix, publicFields, null, con, tables);
+    }
 
-	public void generateFromTables(	final String path,
-									final String pkg,
-									final String suffix,
-									final boolean publicFields,
-									final String schema,
-									final Connection con,
-									final String... tables) throws SQLException, FileNotFoundException {
-		DatabaseMetaData metadata = con.getMetaData();
-		for (String table : tables) {
-			String className = generateClassName(table, suffix);
-			PrintWriter outputStream = new PrintWriter(new FileOutputStream(createFileName(path, pkg, className)));
+    public void generateFromTables(final String path,
+                                   final String pkg,
+                                   final String suffix,
+                                   final boolean publicFields,
+                                   final String schema,
+                                   final Connection con,
+                                   final String... tables) throws SQLException, FileNotFoundException {
+        DatabaseMetaData metadata = con.getMetaData();
+        for (String table : tables) {
+            String className = generateClassName(table, suffix);
+            PrintWriter outputStream = new PrintWriter(new FileOutputStream(createFileName(path, pkg, className)));
 
-			createClassHeader(outputStream, pkg, className);
+            createClassHeader(outputStream, pkg, className);
 
-			ResultSet colResults = metadata.getColumns(null, schema, table, null);
-			createClassBody(colResults, outputStream, className, publicFields);
+            ResultSet colResults = metadata.getColumns(null, schema, table, null);
+            createClassBody(colResults, outputStream, className, publicFields);
 
-			outputStream.close();
-			colResults.close();
-		}
-	}
+            outputStream.close();
+            colResults.close();
+        }
+    }
 
-    public void generateFromResultSet(String path, String pkg, String className, boolean 
-            publicFields, ResultSet resultSet) 
+    public void generateFromResultSet(String path, String pkg, String className, boolean publicFields, ResultSet resultSet)
             throws SQLException, FileNotFoundException {
         ResultSetMetaData metaData = resultSet.getMetaData();
 
-        PrintWriter outputStream = new PrintWriter(new FileOutputStream(createFileName(path, pkg, className)));
+        try (PrintWriter outputStream = new PrintWriter(new FileOutputStream(createFileName(path, pkg, className)))) {
+            createClassHeader(outputStream, pkg, className);
 
-        createClassHeader(outputStream, pkg, className);
-
-        createClassBody(metaData, outputStream, className, publicFields);
-
-        outputStream.close();
+            createClassBody(metaData, outputStream, className, publicFields);
+        }
     }
 
     private void createClassHeader(PrintWriter outputStream, String pkg, String className) {
@@ -80,14 +55,18 @@ public class ClassGenerator {
             outputStream.println("package " + pkg + ";\n");
         }
 
-		outputStream.println("import java.io.Serializable;");
+        outputStream.println("import java.io.Serializable;");
         outputStream.println("import java.sql.Date;");
         outputStream.println("import java.sql.Time;");
         outputStream.println("import java.sql.Timestamp;");
         outputStream.println("import java.math.BigDecimal;");
-		outputStream.println("import java.sql.Blob;");
+        outputStream.println("import java.math.BigInteger;");
+        outputStream.println("import java.sql.Blob;");
         outputStream.println("\n");
-		outputStream.println("public class " + className + " implements Serializable {\n");
+        outputStream.println("public class " + className + " implements Serializable {\n");
+
+        outputStream.println("\n");
+        outputStream.println("  private static final long serialVersionUID = 1L;");
     }
 
     private String createFileName(String path, String pkg, String className) {
@@ -98,8 +77,8 @@ public class ClassGenerator {
         }
     }
 
-    private void createClassBody(ResultSet colResults, PrintWriter outputStream, 
-            String className, boolean publicFields) 
+    private void createClassBody(ResultSet colResults, PrintWriter outputStream,
+                                 String className, boolean publicFields)
             throws SQLException {
         StringBuilder ctrArgs = new StringBuilder();
         StringBuilder ctrBody = new StringBuilder();
@@ -117,8 +96,8 @@ public class ClassGenerator {
         writeCtrAndGetters(outputStream, className, ctrArgs, ctrBody, getters);
     }
 
-    private void createClassBody(ResultSetMetaData metaData, PrintWriter outputStream, 
-            String className, boolean publicFields) 
+    private void createClassBody(ResultSetMetaData metaData, PrintWriter outputStream,
+                                 String className, boolean publicFields)
             throws SQLException {
         StringBuilder ctrArgs = new StringBuilder();
         StringBuilder ctrBody = new StringBuilder();
@@ -143,7 +122,7 @@ public class ClassGenerator {
                 typeString = "byte";
                 break;
             case Types.BIGINT:
-                typeString = "Long";
+                typeString = "BigInteger";
                 break;
             case Types.INTEGER:
                 typeString = "Integer";
@@ -152,8 +131,8 @@ public class ClassGenerator {
                 typeString = "Short";
                 break;
             case Types.CHAR:
-			typeString = "Character";
-			break;
+                typeString = "Character";
+                break;
             case Types.VARCHAR:
             case Types.NVARCHAR:
             case Types.LONGVARCHAR:
@@ -186,7 +165,7 @@ public class ClassGenerator {
                 typeString = "Time";
                 break;
             case Types.BLOB:
-            	typeString = "Blob";
+                typeString = "Blob";
                 break;
             case Types.BINARY:
             case Types.VARBINARY:
@@ -204,24 +183,24 @@ public class ClassGenerator {
         if (suffix == null) {
             suffix = "";
         }
-        return table.substring(0, 1).toUpperCase() + table.substring(1, table.length()).toLowerCase() + suffix;
+        return table.substring(0, 1).toUpperCase() + table.substring(1).toLowerCase() + suffix;
     }
 
-    private void generateCtrAndGetters(int colType, PrintWriter outputStream, 
-            boolean publicFields, String name, StringBuilder ctrArgs, 
-            StringBuilder ctrBody, StringBuilder getters) {
+    private void generateCtrAndGetters(int colType, PrintWriter outputStream,
+                                       boolean publicFields, String name, StringBuilder ctrArgs,
+                                       StringBuilder ctrBody, StringBuilder getters) {
         String type = sqlTypeToJavaTypeString(colType);
         outputStream.println(publicFields ? "  public " : "  private " + type + " " + name + ";");
         ctrArgs.append(type).append(" ").append(name);
         ctrBody.append("    this.").append(name).append(" = ").append(name).append(";\n");
         if (!publicFields) {
-            getters.append("  public ").append(type).append(" get").append(name.substring(0, 1).toUpperCase()).append(name.substring(1, name.length())).append("() {\n");
+            getters.append("  public ").append(type).append(" get").append(name.substring(0, 1).toUpperCase()).append(name.substring(1)).append("() {\n");
             getters.append("    return ").append(name).append(";\n }\n");
         }
     }
 
-    private void writeCtrAndGetters(PrintWriter outputStream, String className, 
-            StringBuilder ctrArgs, StringBuilder ctrBody, StringBuilder getters) {
+    private void writeCtrAndGetters(PrintWriter outputStream, String className,
+                                    StringBuilder ctrArgs, StringBuilder ctrBody, StringBuilder getters) {
         outputStream.println("\n");
         outputStream.println("  public " + className + " (" + ctrArgs.toString() + ") {\n");
         outputStream.println(ctrBody.toString());
